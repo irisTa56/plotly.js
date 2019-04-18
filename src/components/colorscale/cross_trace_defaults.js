@@ -73,4 +73,6 @@ module.exports = function crossTraceDefaults(fullData) {
             });
         }
     }
+
+    // TODO relink color attrs in layout coloraxis[0-9] ???
 };

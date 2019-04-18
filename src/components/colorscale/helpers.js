@@ -60,16 +60,25 @@ function hasColorscale(trace, containerStr) {
  *  - range {array}
  */
 function extractScale(cont, opts) {
-    var cLetter = opts.cLetter;
+    var cont2;
+    var cLetter;
 
-    var scl = cont.reversescale ?
-        flipScale(cont.colorscale) :
-        cont.colorscale;
+    if(cont._colorAx) {
+        cont2 = cont._colorAx;
+        cLetter = 'c';
+    } else {
+        cont2 = cont;
+        cLetter = opts.cLetter;
+    }
+
+    var scl = cont2.reversescale ?
+        flipScale(cont2.colorscale) :
+        cont2.colorscale;
 
     // minimum color value (used to clamp scale)
-    var cmin = cont[cLetter + 'min'];
+    var cmin = cont2[cLetter + 'min'];
     // maximum color value (used to clamp scale)
-    var cmax = cont[cLetter + 'max'];
+    var cmax = cont2[cLetter + 'max'];
 
     var N = scl.length;
     var domain = new Array(N);
