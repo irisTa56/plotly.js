@@ -571,6 +571,11 @@ axes.calcTicks = function calcTicks(ax) {
     // I've only seen this on category axes with all categories off the edge.
     if((ax._tmin < startTick) !== axrev) return [];
 
+    var nMinor = 5;  // TODO: this should be defined by user
+    // support only ticks with numeric interval for now
+    var step = nMinor > 0 && isNumeric(ax.dtick) ?
+        ax.dtick / nMinor : ax.dtick;
+
     // return the full set of tick vals
     var vals = [];
     if(ax.type === 'category' || ax.type === 'multicategory') {
@@ -578,17 +583,39 @@ axes.calcTicks = function calcTicks(ax) {
             Math.min(ax._categories.length - 0.5, endTick);
     }
 
-    var xPrevious = null;
     var maxTicks = Math.max(1000, ax._length || 0);
-    for(var x = ax._tmin;
-            (axrev) ? (x >= endTick) : (x <= endTick);
-            x = axes.tickIncrement(x, ax.dtick, axrev, ax.calendar)) {
+
+    var x = null;
+    var xPrevious = null;
+    for(x = axes.tickIncrement(ax._tmin, -step, axrev, ax.calendar);
+            (axrev) ? (x <= startTick) : (x >= startTick);
+            x = axes.tickIncrement(x, -step, axrev, ax.calendar)) {
         // prevent infinite loops - no more than one tick per pixel,
         // and make sure each value is different from the previous
         if(vals.length > maxTicks || x === xPrevious) break;
         xPrevious = x;
 
-        vals.push(x);
+        // TODO: is there faster way?
+        vals.unshift({
+            x: x,
+            isMajor: false
+        });
+    }
+
+    xPrevious = null;
+    var counter = 0;
+    for(x = ax._tmin;
+            (axrev) ? (x >= endTick) : (x <= endTick);
+            x = axes.tickIncrement(x, step, axrev, ax.calendar)) {
+        // prevent infinite loops - no more than one tick per pixel,
+        // and make sure each value is different from the previous
+        if(vals.length > maxTicks || x === xPrevious) break;
+        xPrevious = x;
+
+        vals.push({
+            x: x,
+            isMajor: nMinor > 0 ? counter++ % nMinor === 0 : true
+        });
     }
 
     // If same angle over a full circle, the last tick vals is a duplicate.
@@ -609,7 +636,11 @@ axes.calcTicks = function calcTicks(ax) {
     ax._inCalcTicks = true;
 
     var ticksOut = new Array(vals.length);
-    for(var i = 0; i < vals.length; i++) ticksOut[i] = axes.tickText(ax, vals[i]);
+    for(var i = 0; i < vals.length; i++) {
+        ticksOut[i] = vals[i].isMajor ?
+            Object.assign(axes.tickText(ax, vals[i].x), {isMajor: vals[i].isMajor}) :
+            Object.assign(tickTextObj(ax, vals[i].x), {isMajor: vals[i].isMajor});
+    }
 
     ax._inCalcTicks = false;
 
@@ -1711,40 +1742,57 @@ axes.drawOne = function(gd, ax, opts) {
     var tickSubplots = [];
 
     if(ax.ticks) {
-        var mainTickPath = axes.makeTickPath(ax, mainLinePosition, tickSigns[2]);
-        var mirrorTickPath;
-        var fullTickPath;
-        if(ax._anchorAxis && ax.mirror && ax.mirror !== true) {
-            mirrorTickPath = axes.makeTickPath(ax, mainMirrorPosition, tickSigns[3]);
-            fullTickPath = mainTickPath + mirrorTickPath;
-        } else {
-            mirrorTickPath = '';
-            fullTickPath = mainTickPath;
-        }
-
-        var tickPath;
-        if(ax.showdividers && ax.ticks === 'outside' && ax.tickson === 'boundaries') {
-            var dividerLookup = {};
-            for(i = 0; i < dividerVals.length; i++) {
-                dividerLookup[dividerVals[i].x] = 1;
+        var makeTickPath = function(length) {
+            var mainTickPath = axes.makeTickPath(ax, mainLinePosition, tickSigns[2], length);
+            var mirrorTickPath;
+            var fullTickPath;
+            if(ax._anchorAxis && ax.mirror && ax.mirror !== true) {
+                mirrorTickPath = axes.makeTickPath(ax, mainMirrorPosition, tickSigns[3], length);
+                fullTickPath = mainTickPath + mirrorTickPath;
+            } else {
+                mirrorTickPath = '';
+                fullTickPath = mainTickPath;
             }
-            tickPath = function(d) {
-                return dividerLookup[d.x] ? mirrorTickPath : fullTickPath;
-            };
-        } else {
-            tickPath = fullTickPath;
-        }
+
+            var tickPath;
+            if(ax.showdividers && ax.ticks === 'outside' && ax.tickson === 'boundaries') {
+                var dividerLookup = {};
+                for(i = 0; i < dividerVals.length; i++) {
+                    dividerLookup[dividerVals[i].x] = 1;
+                }
+                tickPath = function(d) {
+                    return dividerLookup[d.x] ? mirrorTickPath : fullTickPath;
+                };
+            } else {
+                tickPath = fullTickPath;
+            }
+
+            return tickPath;
+        };
 
         axes.drawTicks(gd, ax, {
-            vals: tickVals,
+            vals: tickVals.filter(function(val) {
+                return val.isMajor;
+            }),
             layer: mainAxLayer,
-            path: tickPath,
+            path: makeTickPath(ax.ticklen),
             transFn: transFn
+        });
+
+        axes.drawTicks(gd, ax, {
+            vals: tickVals.filter(function(val) {
+                return !val.isMajor;
+            }),
+            layer: mainAxLayer,
+            path: makeTickPath(ax.ticklen * 0.6),  // TODO: let user change the scale factor
+            transFn: transFn,
+            classSuffix: '-minor'
         });
 
         tickSubplots = Object.keys(ax._linepositions || {});
     }
 
+    // TODO: let subplots be compatible with minor ticks
     for(i = 0; i < tickSubplots.length; i++) {
         sp = tickSubplots[i];
         plotinfo = fullLayout._plots[sp];
@@ -2262,7 +2310,7 @@ function tickDataFn(d) {
 axes.drawTicks = function(gd, ax, opts) {
     opts = opts || {};
 
-    var cls = ax._id + 'tick';
+    var cls = ax._id + 'tick' + (opts.classSuffix || '');
 
     var ticks = opts.layer.selectAll('path.' + cls)
         .data(ax.ticks ? opts.vals : [], tickDataFn);
