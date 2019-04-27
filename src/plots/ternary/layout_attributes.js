@@ -50,6 +50,7 @@ var ternaryAxesAttrs = {
     gridcolor: axesAttrs.gridcolor,
     gridwidth: axesAttrs.gridwidth,
     layer: axesAttrs.layer,
+    nminors: axesAttrs.nminors,
     // range
     min: {
         valType: 'number',

@@ -37,4 +37,9 @@ module.exports = function handleTickValueDefaults(containerIn, containerOut, coe
         if(tickvals === undefined) containerOut.tickmode = 'auto';
         else coerce('ticktext');
     }
+
+    // Skip tick for carpet trace
+    if(containerOut.cheatertype === undefined) {
+        coerce('nminors');
+    }
 };

@@ -571,11 +571,6 @@ axes.calcTicks = function calcTicks(ax) {
     // I've only seen this on category axes with all categories off the edge.
     if((ax._tmin < startTick) !== axrev) return [];
 
-    var nMinor = 5;  // TODO: this should be defined by user
-    // support only ticks with numeric interval for now
-    var step = nMinor > 0 && isNumeric(ax.dtick) ?
-        ax.dtick / nMinor : ax.dtick;
-
     // return the full set of tick vals
     var vals = [];
     if(ax.type === 'category' || ax.type === 'multicategory') {
@@ -585,28 +580,44 @@ axes.calcTicks = function calcTicks(ax) {
 
     var maxTicks = Math.max(1000, ax._length || 0);
 
+    // # of minor ticks between two consecutive major ticks
+    var nMinor = ax.nminors;
+    // currently support only ticks with numeric interval
+    var hasMinor = nMinor > 0 && isNumeric(ax.dtick);
+    var tickStep = hasMinor ? ax.dtick / (nMinor + 1) : ax.dtick;
+
     var x = null;
     var xPrevious = null;
-    for(x = axes.tickIncrement(ax._tmin, -step, axrev, ax.calendar);
-            (axrev) ? (x <= startTick) : (x >= startTick);
-            x = axes.tickIncrement(x, -step, axrev, ax.calendar)) {
-        // prevent infinite loops - no more than one tick per pixel,
-        // and make sure each value is different from the previous
-        if(vals.length > maxTicks || x === xPrevious) break;
-        xPrevious = x;
 
-        // TODO: is there faster way?
-        vals.unshift({
-            x: x,
-            isMajor: false
-        });
+    if(hasMinor) {
+        // to stop minor ticks
+        startTick = (axrev) ? Math.min(ax._categories.length - 0.5, startTick) :
+            Math.max(-0.5, startTick);
+
+        for(x = axes.tickIncrement(ax._tmin, -tickStep, axrev, ax.calendar);
+                (axrev) ? (x <= startTick) : (x >= startTick);
+                x = axes.tickIncrement(x, -tickStep, axrev, ax.calendar)) {
+            // prevent infinite loops - no more than one tick per pixel,
+            // and make sure each value is different from the previous
+            if(vals.length > maxTicks || x === xPrevious) break;
+            xPrevious = x;
+
+            // TODO: is there faster way?
+            vals.unshift({
+                x: x,
+                isMajor: false
+            });
+        }
+
+        x = null;
+        xPrevious = null;
     }
 
-    xPrevious = null;
     var counter = 0;
+
     for(x = ax._tmin;
             (axrev) ? (x >= endTick) : (x <= endTick);
-            x = axes.tickIncrement(x, step, axrev, ax.calendar)) {
+            x = axes.tickIncrement(x, tickStep, axrev, ax.calendar)) {
         // prevent infinite loops - no more than one tick per pixel,
         // and make sure each value is different from the previous
         if(vals.length > maxTicks || x === xPrevious) break;
@@ -614,7 +625,7 @@ axes.calcTicks = function calcTicks(ax) {
 
         vals.push({
             x: x,
-            isMajor: nMinor > 0 ? counter++ % nMinor === 0 : true
+            isMajor: hasMinor ? counter++ % (nMinor + 1) === 0 : true
         });
     }
 
@@ -635,12 +646,9 @@ axes.calcTicks = function calcTicks(ax) {
     ax._prevDateHead = '';
     ax._inCalcTicks = true;
 
-    var ticksOut = new Array(vals.length);
-    for(var i = 0; i < vals.length; i++) {
-        ticksOut[i] = vals[i].isMajor ?
-            Object.assign(axes.tickText(ax, vals[i].x), {isMajor: vals[i].isMajor}) :
-            Object.assign(tickTextObj(ax, vals[i].x), {isMajor: vals[i].isMajor});
-    }
+    var ticksOut = vals.map(function(val) {
+        return axes.tickTextWrapper(ax, val);
+    });
 
     ax._inCalcTicks = false;
 
@@ -963,6 +971,18 @@ axes.tickFirst = function(ax) {
     } else throw 'unrecognized dtick ' + String(dtick);
 };
 
+axes.tickTextWrapper = function(ax, x) {
+    if(x.isMajor) {
+        return Object.assign(
+            axes.tickText(ax, x.x), {isMajor: true});
+    } else {
+        var out = Object.assign(
+            tickTextObj(ax, x.x), {isMajor: false});
+        axes.tickBoundary(ax, out);
+        return out;
+    }
+};
+
 // draw the text for one tick.
 // px,py are the location on gd.paper
 // prefix is there so the x axis ticks can be dropped a line
@@ -1018,21 +1038,25 @@ axes.tickText = function(ax, x, hover) {
     if(ax.tickprefix && !isHidden(ax.showtickprefix)) out.text = ax.tickprefix + out.text;
     if(ax.ticksuffix && !isHidden(ax.showticksuffix)) out.text += ax.ticksuffix;
 
-    // Setup ticks and grid lines boundaries
-    // at 1/2 a 'category' to the left/bottom
+    axes.tickBoundary(ax, out);
+
+    return out;
+};
+
+// Setup ticks and grid lines boundaries
+// at 1/2 a 'category' to the left/bottom
+axes.tickBoundary = function(ax, obj) {
     if(ax.tickson === 'boundaries' || ax.showdividers) {
         var inbounds = function(v) {
             var p = ax.l2p(v);
             return p >= 0 && p <= ax._length ? v : null;
         };
 
-        out.xbnd = [
-            inbounds(out.x - 0.5),
-            inbounds(out.x + ax.dtick - 0.5)
+        obj.xbnd = [
+            inbounds(obj.x - 0.5),
+            inbounds(obj.x + ax.dtick - 0.5)
         ];
     }
-
-    return out;
 };
 
 /**

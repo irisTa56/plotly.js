@@ -614,6 +614,26 @@ module.exports = {
             '*%H~%M~%S.%2f* would display *09~15~23.46*'
         ].join(' ')
     },
+    nminors: {
+        valType: 'integer',
+        min: 0,
+        dflt: 0,
+        role: 'style',
+        editType: 'ticks',
+        description: [
+            'Number of minor ticks between two consecutive major ticks.'
+        ].join(' ')
+    },
+    /* minorlenratio: {
+        valType: 'number',
+        min: 0,
+        dflt: 0.5,
+        role: 'style',
+        editType: 'ticks',
+        description: [
+            '...'
+        ].join(' ')
+    }, */
     // lines and grids
     showline: {
         valType: 'boolean',

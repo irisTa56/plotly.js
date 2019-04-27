@@ -52,7 +52,8 @@ var axisTickAttrs = overrideAll({
     tickangle: axesAttrs.tickangle,
     tickformat: axesAttrs.tickformat,
     tickformatstops: axesAttrs.tickformatstops,
-    layer: axesAttrs.layer
+    layer: axesAttrs.layer,
+    nminors: axesAttrs.nminors
 }, 'plot', 'from-root');
 
 var radialAxisAttrs = {

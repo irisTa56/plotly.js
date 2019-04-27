@@ -109,6 +109,7 @@ module.exports = overrideAll({
     tickformat: axesAttrs.tickformat,
     tickformatstops: axesAttrs.tickformatstops,
     hoverformat: axesAttrs.hoverformat,
+    nminors: axesAttrs.nminors,
     // lines and grids
     showline: axesAttrs.showline,
     linecolor: axesAttrs.linecolor,
