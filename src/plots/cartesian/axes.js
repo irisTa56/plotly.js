@@ -590,15 +590,16 @@ axes.calcTicks = function calcTicks(ax) {
         }
     }
 
+    var x = null;
     var xPrevious = null;
     var maxTicks = Math.max(1000, ax._length || 0);
 
     var tickStep = hasMinor ? ax.dtick / nMinorP1 : ax.dtick;
 
     if(hasMinor) {
-        for(var x = axes.tickIncrement(ax._tmin, -tickStep, axrev, ax.calendar);
-                (axrev) ? (x <= startTick) : (x >= startTick);
-                x = axes.tickIncrement(x, -tickStep, axrev, ax.calendar)) {
+        for(x = axes.tickIncrement(ax._tmin, -tickStep, axrev, ax.calendar);
+            (axrev) ? (x <= startTick) : (x >= startTick);
+            x = axes.tickIncrement(x, -tickStep, axrev, ax.calendar)) {
             // prevent infinite loops - no more than one tick per pixel,
             // and make sure each value is different from the previous
             if(vals.length > maxTicks || x === xPrevious) break;
@@ -607,14 +608,15 @@ axes.calcTicks = function calcTicks(ax) {
             vals.unshift(x);
         }
 
+        x = null;
         xPrevious = null;
     }
 
     var firstMjrIdx = vals.length;
 
-    for(var x = ax._tmin;
-            (axrev) ? (x >= endTick) : (x <= endTick);
-            x = axes.tickIncrement(x, tickStep, axrev, ax.calendar)) {
+    for(x = ax._tmin;
+        (axrev) ? (x >= endTick) : (x <= endTick);
+        x = axes.tickIncrement(x, tickStep, axrev, ax.calendar)) {
         // prevent infinite loops - no more than one tick per pixel,
         // and make sure each value is different from the previous
         if(vals.length > maxTicks || x === xPrevious) break;
@@ -646,7 +648,7 @@ axes.calcTicks = function calcTicks(ax) {
     var ticksOut = hasMinor ?
         vals.map(function(val, idx) {
             return axes.tickTextWrapper(
-                ax, val, (idx - firstMjrIdx) % nMinorP1 == 0);
+                ax, val, (idx - firstMjrIdx) % nMinorP1 === 0);
         }) : vals.map(function(val) { return axes.tickText(ax, val); });
 
     ax._hasMinor = hasMinor;
@@ -1058,7 +1060,7 @@ function tickBoundary(ax, obj) {
             inbounds(obj.x + ax.dtick - 0.5)
         ];
     }
-};
+}
 
 /**
  * create text for a hover label on this axis, with special handling of
@@ -1795,7 +1797,7 @@ axes.drawOne = function(gd, ax, opts) {
             return tickPath;
         };
 
-        if(ax._hasMinor){
+        if(ax._hasMinor) {
             axes.drawTicks(gd, ax, {
                 vals: tickVals.filter(function(val) {
                     return val.isMajor;
