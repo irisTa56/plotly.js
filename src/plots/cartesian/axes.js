@@ -571,30 +571,32 @@ axes.calcTicks = function calcTicks(ax) {
     // I've only seen this on category axes with all categories off the edge.
     if((ax._tmin < startTick) !== axrev) return [];
 
+    // # of minor ticks between two consecutive major ticks
+    var nMinorP1 = ax.nminors + 1;
+    // currently support only ticks with numeric interval
+    var hasMinor = nMinorP1 > 1 && isNumeric(ax.dtick);
+
     // return the full set of tick vals
     var vals = [];
     if(ax.type === 'category' || ax.type === 'multicategory') {
         endTick = (axrev) ? Math.max(-0.5, endTick) :
             Math.min(ax._categories.length - 0.5, endTick);
+
+        if(hasMinor) {
+            // to stop minor ticks
+            startTick = (axrev) ?
+                Math.min(ax._categories.length - 0.5, startTick) :
+                Math.max(-0.5, startTick);
+        }
     }
 
+    var xPrevious = null;
     var maxTicks = Math.max(1000, ax._length || 0);
 
-    // # of minor ticks between two consecutive major ticks
-    var nMinor = ax.nminors;
-    // currently support only ticks with numeric interval
-    var hasMinor = nMinor > 0 && isNumeric(ax.dtick);
-    var tickStep = hasMinor ? ax.dtick / (nMinor + 1) : ax.dtick;
-
-    var x = null;
-    var xPrevious = null;
+    var tickStep = hasMinor ? ax.dtick / nMinorP1 : ax.dtick;
 
     if(hasMinor) {
-        // to stop minor ticks
-        startTick = (axrev) ? Math.min(ax._categories.length - 0.5, startTick) :
-            Math.max(-0.5, startTick);
-
-        for(x = axes.tickIncrement(ax._tmin, -tickStep, axrev, ax.calendar);
+        for(var x = axes.tickIncrement(ax._tmin, -tickStep, axrev, ax.calendar);
                 (axrev) ? (x <= startTick) : (x >= startTick);
                 x = axes.tickIncrement(x, -tickStep, axrev, ax.calendar)) {
             // prevent infinite loops - no more than one tick per pixel,
@@ -602,20 +604,15 @@ axes.calcTicks = function calcTicks(ax) {
             if(vals.length > maxTicks || x === xPrevious) break;
             xPrevious = x;
 
-            // TODO: is there faster way?
-            vals.unshift({
-                x: x,
-                isMajor: false
-            });
+            vals.unshift(x);
         }
 
-        x = null;
         xPrevious = null;
     }
 
-    var counter = 0;
+    var firstMjrIdx = vals.length;
 
-    for(x = ax._tmin;
+    for(var x = ax._tmin;
             (axrev) ? (x >= endTick) : (x <= endTick);
             x = axes.tickIncrement(x, tickStep, axrev, ax.calendar)) {
         // prevent infinite loops - no more than one tick per pixel,
@@ -623,10 +620,7 @@ axes.calcTicks = function calcTicks(ax) {
         if(vals.length > maxTicks || x === xPrevious) break;
         xPrevious = x;
 
-        vals.push({
-            x: x,
-            isMajor: hasMinor ? counter++ % (nMinor + 1) === 0 : true
-        });
+        vals.push(x);
     }
 
     // If same angle over a full circle, the last tick vals is a duplicate.
@@ -637,7 +631,10 @@ axes.calcTicks = function calcTicks(ax) {
 
     // save the last tick as well as first, so we can
     // show the exponent only on the last one
-    ax._tmax = vals[vals.length - 1];
+    ax._tmax = hasMinor ?
+        vals[nMinorP1 * Math.floor(
+            (vals.length - firstMjrIdx - 1) / nMinorP1)] :
+        vals[vals.length - 1];
 
     // for showing the rest of a date when the main tick label is only the
     // latter part: ax._prevDateHead holds what we showed most recently.
@@ -646,9 +643,13 @@ axes.calcTicks = function calcTicks(ax) {
     ax._prevDateHead = '';
     ax._inCalcTicks = true;
 
-    var ticksOut = vals.map(function(val) {
-        return axes.tickTextWrapper(ax, val);
-    });
+    var ticksOut = hasMinor ?
+        vals.map(function(val, idx) {
+            return axes.tickTextWrapper(
+                ax, val, (idx - firstMjrIdx) % nMinorP1 == 0);
+        }) : vals.map(function(val) { return axes.tickText(ax, val); });
+
+    ax._hasMinor = hasMinor;
 
     ax._inCalcTicks = false;
 
@@ -971,16 +972,16 @@ axes.tickFirst = function(ax) {
     } else throw 'unrecognized dtick ' + String(dtick);
 };
 
-axes.tickTextWrapper = function(ax, x) {
-    if(x.isMajor) {
-        return Object.assign(
-            axes.tickText(ax, x.x), {isMajor: true});
+axes.tickTextWrapper = function(ax, x, isMajor) {
+    var out;
+    if(isMajor) {
+        out = axes.tickText(ax, x);
     } else {
-        var out = Object.assign(
-            tickTextObj(ax, x.x), {isMajor: false});
-        axes.tickBoundary(ax, out);
-        return out;
+        out = tickTextObj(ax, x);
+        tickBoundary(ax, out);
     }
+    out.isMajor = isMajor;
+    return out;
 };
 
 // draw the text for one tick.
@@ -1038,14 +1039,14 @@ axes.tickText = function(ax, x, hover) {
     if(ax.tickprefix && !isHidden(ax.showtickprefix)) out.text = ax.tickprefix + out.text;
     if(ax.ticksuffix && !isHidden(ax.showticksuffix)) out.text += ax.ticksuffix;
 
-    axes.tickBoundary(ax, out);
+    tickBoundary(ax, out);
 
     return out;
 };
 
 // Setup ticks and grid lines boundaries
 // at 1/2 a 'category' to the left/bottom
-axes.tickBoundary = function(ax, obj) {
+function tickBoundary(ax, obj) {
     if(ax.tickson === 'boundaries' || ax.showdividers) {
         var inbounds = function(v) {
             var p = ax.l2p(v);
@@ -1794,24 +1795,33 @@ axes.drawOne = function(gd, ax, opts) {
             return tickPath;
         };
 
-        axes.drawTicks(gd, ax, {
-            vals: tickVals.filter(function(val) {
-                return val.isMajor;
-            }),
-            layer: mainAxLayer,
-            path: makeTickPath(ax.ticklen),
-            transFn: transFn
-        });
+        if(ax._hasMinor){
+            axes.drawTicks(gd, ax, {
+                vals: tickVals.filter(function(val) {
+                    return val.isMajor;
+                }),
+                layer: mainAxLayer,
+                path: makeTickPath(ax.ticklen),
+                transFn: transFn
+            });
 
-        axes.drawTicks(gd, ax, {
-            vals: tickVals.filter(function(val) {
-                return !val.isMajor;
-            }),
-            layer: mainAxLayer,
-            path: makeTickPath(ax.ticklen * 0.6),  // TODO: let user change the scale factor
-            transFn: transFn,
-            classSuffix: '-minor'
-        });
+            axes.drawTicks(gd, ax, {
+                vals: tickVals.filter(function(val) {
+                    return !val.isMajor;
+                }),
+                layer: mainAxLayer,
+                path: makeTickPath(ax.ticklen * 0.6),  // TODO: let user change the scale factor
+                transFn: transFn,
+                classSuffix: '-minor'
+            });
+        } else {
+            axes.drawTicks(gd, ax, {
+                vals: tickVals,
+                layer: mainAxLayer,
+                path: makeTickPath(ax.ticklen),
+                transFn: transFn
+            });
+        }
 
         tickSubplots = Object.keys(ax._linepositions || {});
     }
