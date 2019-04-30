@@ -1808,17 +1808,15 @@ axes.drawOne = function(gd, ax, opts) {
                 transFn: transFn
             });
 
-            if(ax.minorlenratio != undefined) {
-                axes.drawTicks(gd, ax, {
-                    vals: tickVals.filter(function(val) {
-                        return !val.isMajor;
-                    }),
-                    layer: mainAxLayer,
-                    path: makeTickPath(ax.ticklen * ax.minorlenratio),
-                    transFn: transFn,
-                    classSuffix: '-minor'
-                });
-            }
+            axes.drawTicks(gd, ax, {
+                vals: tickVals.filter(function(val) {
+                    return !val.isMajor;
+                }),
+                layer: mainAxLayer,
+                path: makeTickPath(ax.ticklen * (ax.minorlenratio || 0)),
+                transFn: transFn,
+                classSuffix: '-minor'
+            });
         } else {
             axes.drawTicks(gd, ax, {
                 vals: tickVals,
@@ -1831,21 +1829,45 @@ axes.drawOne = function(gd, ax, opts) {
         tickSubplots = Object.keys(ax._linepositions || {});
     }
 
-    // TODO: let subplots be compatible with minor ticks
+    var makeSpTickPath = function(linepositions, length) {
+        return axes.makeTickPath(ax, linepositions[0], tickSigns[0], length) +
+            axes.makeTickPath(ax, linepositions[1], tickSigns[1], length);
+    };
+
     for(i = 0; i < tickSubplots.length; i++) {
         sp = tickSubplots[i];
         plotinfo = fullLayout._plots[sp];
         // [bottom or left, top or right], free and main are handled above
         var linepositions = ax._linepositions[sp] || [];
-        var spTickPath = axes.makeTickPath(ax, linepositions[0], tickSigns[0]) +
-            axes.makeTickPath(ax, linepositions[1], tickSigns[1]);
 
-        axes.drawTicks(gd, ax, {
-            vals: tickVals,
-            layer: plotinfo[axLetter + 'axislayer'],
-            path: spTickPath,
-            transFn: transFn
-        });
+        if(ax._hasMinor) {
+            axes.drawTicks(gd, ax, {
+                vals: tickVals.filter(function(val) {
+                    return val.isMajor;
+                }),
+                layer: plotinfo[axLetter + 'axislayer'],
+                path: makeSpTickPath(linepositions, ax.ticklen),
+                transFn: transFn
+            });
+
+            axes.drawTicks(gd, ax, {
+                vals: tickVals.filter(function(val) {
+                    return !val.isMajor;
+                }),
+                layer: plotinfo[axLetter + 'axislayer'],
+                path: makeSpTickPath(
+                    linepositions, ax.ticklen * (ax.minorlenratio || 0)),
+                transFn: transFn,
+                classSuffix: '-minor'
+            });
+        } else {
+            axes.drawTicks(gd, ax, {
+                vals: tickVals,
+                layer: plotinfo[axLetter + 'axislayer'],
+                path: makeSpTickPath(linepositions, ax.ticklen),
+                transFn: transFn
+            });
+        }
     }
 
     var seq = [];
