@@ -51,6 +51,7 @@ var ternaryAxesAttrs = {
     gridwidth: axesAttrs.gridwidth,
     layer: axesAttrs.layer,
     nminors: axesAttrs.nminors,
+    minorlenratio: axesAttrs.minorlenratio,
     // range
     min: {
         valType: 'number',

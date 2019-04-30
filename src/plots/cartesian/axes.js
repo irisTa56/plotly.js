@@ -572,7 +572,8 @@ axes.calcTicks = function calcTicks(ax) {
     if((ax._tmin < startTick) !== axrev) return [];
 
     // # of minor ticks between two consecutive major ticks
-    var nMinorP1 = ax.nminors + 1;
+    // fallback to zero if `nminors` is undefined
+    var nMinorP1 = (ax.nminors || 0) + 1;
     // currently support only ticks with numeric interval
     var hasMinor = nMinorP1 > 1 && isNumeric(ax.dtick);
 
@@ -583,7 +584,7 @@ axes.calcTicks = function calcTicks(ax) {
             Math.min(ax._categories.length - 0.5, endTick);
 
         if(hasMinor) {
-            // to stop minor ticks
+            // this is required for stopping minor ticks
             startTick = (axrev) ?
                 Math.min(ax._categories.length - 0.5, startTick) :
                 Math.max(-0.5, startTick);
@@ -1807,15 +1808,17 @@ axes.drawOne = function(gd, ax, opts) {
                 transFn: transFn
             });
 
-            axes.drawTicks(gd, ax, {
-                vals: tickVals.filter(function(val) {
-                    return !val.isMajor;
-                }),
-                layer: mainAxLayer,
-                path: makeTickPath(ax.ticklen * 0.6),  // TODO: let user change the scale factor
-                transFn: transFn,
-                classSuffix: '-minor'
-            });
+            if(ax.minorlenratio != undefined) {
+                axes.drawTicks(gd, ax, {
+                    vals: tickVals.filter(function(val) {
+                        return !val.isMajor;
+                    }),
+                    layer: mainAxLayer,
+                    path: makeTickPath(ax.ticklen * ax.minorlenratio),
+                    transFn: transFn,
+                    classSuffix: '-minor'
+                });
+            }
         } else {
             axes.drawTicks(gd, ax, {
                 vals: tickVals,

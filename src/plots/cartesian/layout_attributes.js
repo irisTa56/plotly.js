@@ -620,20 +620,16 @@ module.exports = {
         dflt: 0,
         role: 'style',
         editType: 'ticks',
-        description: [
-            'Number of minor ticks between two consecutive major ticks.'
-        ].join(' ')
+        description: 'Number of minor ticks between two consecutive major ticks.'
     },
-    /* minorlenratio: {
+    minorlenratio: {
         valType: 'number',
         min: 0,
         dflt: 0.5,
         role: 'style',
         editType: 'ticks',
-        description: [
-            '...'
-        ].join(' ')
-    }, */
+        description: 'Ratio of the length of minor ticks to that of major ticks.'
+    },
     // lines and grids
     showline: {
         valType: 'boolean',

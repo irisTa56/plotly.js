@@ -41,5 +41,6 @@ module.exports = function handleTickValueDefaults(containerIn, containerOut, coe
     // Skip tick for carpet trace
     if(containerOut.cheatertype === undefined) {
         coerce('nminors');
+        coerce('minorlenratio');
     }
 };

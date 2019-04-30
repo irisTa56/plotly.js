@@ -175,6 +175,7 @@ module.exports = overrideAll({
     exponentformat: axesAttrs.exponentformat,
     showexponent: axesAttrs.showexponent,
     nminors: axesAttrs.nminors,
+    minorlenratio: axesAttrs.minorlenratio,
     title: {
         text: {
             valType: 'string',

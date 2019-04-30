@@ -53,7 +53,8 @@ var axisTickAttrs = overrideAll({
     tickformat: axesAttrs.tickformat,
     tickformatstops: axesAttrs.tickformatstops,
     layer: axesAttrs.layer,
-    nminors: axesAttrs.nminors
+    nminors: axesAttrs.nminors,
+    minorlenratio: axesAttrs.minorlenratio
 }, 'plot', 'from-root');
 
 var radialAxisAttrs = {
